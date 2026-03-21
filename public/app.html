@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mini WhatsApp</title>
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <header>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button id="sidebar-toggle" class="sidebar-toggle" style="background: none; border: none; color: white; font-size: 1.5em; cursor: pointer; display: none;">☰</button>
+                    <h2>Chats</h2>
+                    <div>
+                        <button id="mute-toggle" style="background: none; border: none; color: white; font-size: 1.2em; cursor: pointer; margin-right: 5px;">🔊</button>
+                        <button id="theme-toggle" style="background: none; border: none; color: white; font-size: 1.2em; cursor: pointer; margin-right: 5px;">🌙</button>
+                        <button id="blocked-list-btn" style="background: none; border: none; color: white; font-size: 1.2em; cursor: pointer;">🚫</button>
+                    </div>
+                </div>
+                <div class="my-info" id="myInfo"></div>
+            </header>
+            <ul id="contact-list" class="contact-list"></ul>
+        </aside>
+
+        <!-- Main chat area -->
+        <main class="chat-area">
+            <header id="chat-header">
+                <button id="chat-back-btn" class="back-btn" style="background: none; border: none; font-size: 1.5em; cursor: pointer; display: none;">←</button>
+                <h3 id="active-contact-name">Select a contact</h3>
+                <span id="contact-status" class="contact-status"></span>
+                <div class="chat-menu">
+                    <button id="chat-menu-btn">⋮</button>
+                    <div id="chat-menu-dropdown" class="dropdown-content" style="display: none;"></div>
+                </div>
+            </header>
+
+            <!-- Search bar -->
+            <div style="padding: 5px 10px; background: #f0f2f5; position: relative;">
+                <input type="text" id="search-input" placeholder="Search messages..." style="width: 100%; padding: 8px; border-radius: 20px; border: 1px solid #ccc;">
+                <div id="search-results" style="display: none; position: absolute; background: white; border: 1px solid #ccc; max-height: 300px; overflow-y: auto; width: calc(100% - 20px); z-index: 1000; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); left: 10px; right: 10px;"></div>
+            </div>
+
+            <!-- Messages -->
+            <div id="chat-box" class="chat-box"></div>
+
+            <!-- Reply preview bar -->
+            <div id="reply-preview" style="display: none; padding: 5px; background: #e0e0e0; border-left: 3px solid #00a884;">
+                <span id="reply-text"></span>
+                <button id="cancel-reply">✖</button>
+            </div>
+
+            <!-- Message context menu -->
+            <div id="message-context-menu" class="context-menu" style="display: none;">
+                <button class="context-reply">Reply</button>
+                <button class="context-forward">Forward</button>
+                <hr>
+                <button class="context-delete-me">Delete for me</button>
+                <button class="context-delete-everyone">Delete for everyone</button>
+            </div>
+
+            <!-- Forward selector -->
+            <div id="forward-selector" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.3); z-index: 2000;">
+                <h3>Forward to</h3>
+                <ul id="forward-contact-list" style="list-style: none; max-height: 300px; overflow-y: auto;"></ul>
+                <button id="cancel-forward">Cancel</button>
+            </div>
+
+            <!-- Blocked contacts panel -->
+            <div id="blocked-panel" style="display: none; background: white; border: 1px solid #ccc; border-radius: 4px; margin: 5px; padding: 10px; position: absolute; top: 60px; left: 10px; width: 250px; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
+                <h4 style="margin: 0 0 10px 0;">Blocked Contacts</h4>
+                <ul id="blocked-list" style="list-style: none; padding: 0;"></ul>
+                <button id="close-blocked-panel">Close</button>
+            </div>
+
+            <!-- Input area -->
+            <div class="chat-input-area">
+                <button id="emoji-btn">😊</button>
+                <div id="emoji-picker" class="emoji-picker" style="display: none;"></div>
+                <input type="text" id="msg" placeholder="Type a message" />
+                <button id="sendMsgBtn">Send</button>
+
+                <input type="file" id="fileInput" style="display: none;" multiple />
+                <button id="attach-btn">📎</button>
+                <button id="sendFileBtn" disabled>Send File(s)</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="modal-title">Confirm</span>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="modal-message"></p>
+                <div id="modal-input-container" style="display: none;">
+                    <input type="text" id="modal-input" placeholder="Enter name...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="modal-cancel-btn" class="modal-btn modal-btn-cancel">Cancel</button>
+                <button id="modal-confirm-btn" class="modal-btn modal-btn-confirm">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
