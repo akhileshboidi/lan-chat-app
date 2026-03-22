@@ -1,4 +1,3 @@
-// public/js/modules/ui.js
 import * as store from '../store.js';
 import { formatBytes, getTimestamp } from './utils.js';
 import { playSeenSound } from './sounds.js';
@@ -107,8 +106,7 @@ export function renderActiveConversation() {
                                 <progress value="${percent}" max="100"></progress>
                                 <span class="file-speed">${percent}% ${speed}</span>
                             </div>`;
-                        // Only show controls if still sending and not yet completed (no url)
-                        if (msg.isOwn && store.sendingFiles[msg.id] && !msg.url) {
+                        if (msg.isOwn && store.sendingFiles[msg.id]) {
                             const fileState = store.sendingFiles[msg.id];
                             content += `
                                 <div class="file-controls">
@@ -209,7 +207,7 @@ export function selectContact(ip, name) {
     if (store.conversations[ip]) store.conversations[ip].unread = 0;
     store.saveConversations();
 
-    // The UI update callback (setOnStateChange) already triggers re‑renders.
-    // We only need to focus the input field.
+    renderActiveConversation();
+    renderContactList(store.peersList);
     document.getElementById('msg').focus();
 }

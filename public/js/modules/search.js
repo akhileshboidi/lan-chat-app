@@ -1,4 +1,3 @@
-// public/js/modules/search.js
 import * as store from '../store.js';
 import { selectContact } from './ui.js';
 

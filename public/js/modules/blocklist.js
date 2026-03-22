@@ -1,6 +1,4 @@
-// public/js/modules/blocklist.js
 import * as store from '../store.js';
-import { showToast } from './notifications.js';
 
 export function renderBlockedPanel() {
     const list = document.getElementById('blocked-list');

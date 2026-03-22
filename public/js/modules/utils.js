@@ -1,4 +1,3 @@
-// public/js/modules/utils.js
 import { conversations, saveConversations, updateState } from '../store.js';
 
 export function formatBytes(bytes) {

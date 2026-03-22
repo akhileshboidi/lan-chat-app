@@ -1,4 +1,3 @@
-// public/js/modules/contextMenu.js
 import { showToast } from './notifications.js';
 import { generateMessageId, getTimestamp } from './utils.js';
 

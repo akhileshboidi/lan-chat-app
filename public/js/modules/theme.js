@@ -1,4 +1,3 @@
-// public/js/modules/theme.js
 export function initTheme() {
     const themeToggle = document.getElementById('theme-toggle');
     const savedTheme = localStorage.getItem('theme');

@@ -1,4 +1,3 @@
-// public/js/modules/sounds.js
 let soundMuted = localStorage.getItem('soundMuted') === 'true';
 
 export function setSoundMuted(muted) {

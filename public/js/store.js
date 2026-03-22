@@ -1,6 +1,4 @@
-// public/js/store.js
 // Central state and persistence
-
 export let peersList = [];
 export let onlineIPs = new Set();
 export let conversations = {};
@@ -20,7 +18,6 @@ export function updateState() {
     if (onStateChange) onStateChange();
 }
 
-// Setters for read‑only exports
 export function setActivePeerIP(ip) {
     activePeerIP = ip;
     updateState();

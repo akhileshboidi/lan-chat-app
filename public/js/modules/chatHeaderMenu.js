@@ -1,4 +1,3 @@
-// public/js/modules/chatHeaderMenu.js
 import { confirmModal, promptModal } from './modal.js';
 import { showToast } from './notifications.js';
 import { addSystemMessageToConversation } from './utils.js';
@@ -77,7 +76,6 @@ export function initChatHeaderMenu(socketRef, storeRef, renderActiveFn, renderCo
             renderContactList(store.peersList);
         }
         store.saveBlockedIPs();
-        // Update block button text if needed (handled by selectContact when unblocked)
         chatMenuDropdown.style.display = 'none';
     });
 

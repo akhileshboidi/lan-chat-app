@@ -1,4 +1,3 @@
-// public/js/modules/indexeddb.js
 import { conversations, activePeerIP, saveConversations } from '../store.js';
 
 const DB_NAME = 'WhatsAppClone';

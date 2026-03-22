@@ -1,4 +1,3 @@
-// public/js/modules/modal.js
 let modalResolve = null;
 
 function showModal(message, title = 'Confirm', showInput = false, defaultValue = '') {

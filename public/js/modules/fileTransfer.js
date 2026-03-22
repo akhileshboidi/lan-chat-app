@@ -1,4 +1,3 @@
-// public/js/modules/fileTransfer.js
 import * as store from '../store.js';
 import { updateFileMessage, renderActiveConversation, renderContactList } from './ui.js';
 import { saveFileToDB } from './indexeddb.js';
