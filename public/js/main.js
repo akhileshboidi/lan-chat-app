@@ -7,7 +7,7 @@ import { renderBlockedPanel, updateBlockButtonText } from './modules/blocklist.j
 import { performSearch } from './modules/search.js';
 import { addSystemMessageToConversation, formatBytes, generateMessageId, getTimestamp } from './modules/utils.js';
 import { restoreFilesFromDB, deleteFileFromDB } from './modules/indexeddb.js';
-import { sendNextChunk, CHUNK_SIZE, handleFileStart, handleFileChunk, handleFileEnd, pauseFile, resumeFile, cancelFile } from './modules/fileTransfer.js';
+import { sendNextChunk, CHUNK_SIZE, handleFileStart, handleFileChunk, handleFileEnd, pauseFile, resumeFile, cancelFile, handleFileChunkAck } from './modules/fileTransfer.js';
 import { renderContactList, renderActiveConversation, updateFileMessage, markMessagesAsSeen, selectContact } from './modules/ui.js';
 import { initContextMenu } from './modules/contextMenu.js';
 import { initChatHeaderMenu } from './modules/chatHeaderMenu.js';
@@ -335,7 +335,6 @@ socket.on('resume-file', ({ messageId, offset }) => {
 socket.on('file-chunk-ack', ({ name, offset: ackedOffset, messageId }) => {
     handleFileChunkAck(messageId, ackedOffset);
 });
-
 // ---------- UI EVENT HANDLERS ----------
 document.getElementById('sendMsgBtn').addEventListener('click', sendMessage);
 document.getElementById('msg').addEventListener('keypress', (e) => {
