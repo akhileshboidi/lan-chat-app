@@ -1,4 +1,3 @@
-// server.js
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -9,11 +8,12 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-    maxHttpBufferSize: 1e8
+    maxHttpBufferSize: 1e8 // 100MB safety
 });
 
 app.use(express.static("public"));
 
+// Helper to get server's LAN IP
 function getServerLANIP() {
     const nets = os.networkInterfaces();
     for (const name of Object.keys(nets)) {
@@ -26,6 +26,7 @@ function getServerLANIP() {
     return 'localhost';
 }
 
+// Endpoint to get client's own IP
 app.get("/myip", (req, res) => {
     const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
     let cleanIp = clientIp;
@@ -49,17 +50,30 @@ app.get("/myip", (req, res) => {
     res.json({ ip: cleanIp });
 });
 
-let peers = {};
+let peers = {}; // socket.id -> { name, ip }
+const MAX_PEERS = 50;
+
+// File transfer concurrency control
+let activeFileTransfers = 0;
+const MAX_CONCURRENT_FILE_TRANSFERS = 3;
+let pendingFileStarts = []; // each item: { socket, targetIP, name, size, messageId }
 
 io.on("connection", (socket) => {
     console.log("Peer connected:", socket.id);
 
     socket.on("register", ({ name, ip }) => {
+        // Check if maximum number of peers is already reached
+        if (Object.keys(peers).length >= MAX_PEERS) {
+            socket.emit("registration-failed", { reason: "Maximum number of users reached (50). Try again later." });
+            return;
+        }
         peers[socket.id] = { name, ip };
         io.emit("peer-list", Object.values(peers));
     });
 
+    // ---------- CHAT MESSAGES ----------
     socket.on("p2p-message", ({ targetIP, message, messageId, replyTo }) => {
+            console.log(`Server received p2p-message from ${peers[socket.id]?.ip} to ${targetIP}, replyTo:`, replyTo);
         const targetSocket = Object.keys(peers).find(id => peers[id].ip === targetIP);
         if (targetSocket) {
             io.to(targetSocket).emit("p2p-message", {
@@ -72,6 +86,7 @@ io.on("connection", (socket) => {
         }
     });
 
+    // Delivery acknowledgment
     socket.on("message-delivered", ({ targetIP, messageId }) => {
         const targetSocket = Object.keys(peers).find(id => peers[id].ip === targetIP);
         if (targetSocket) {
@@ -79,6 +94,7 @@ io.on("connection", (socket) => {
         }
     });
 
+    // Message seen
     socket.on("message-seen", ({ targetIP, messageIds }) => {
         const targetSocket = Object.keys(peers).find(id => peers[id].ip === targetIP);
         if (targetSocket) {
@@ -86,21 +102,34 @@ io.on("connection", (socket) => {
         }
     });
 
-// Delete message for everyone (broadcast to both sender and receiver)
-socket.on("delete-message", ({ targetIP, messageId }) => {
-    const targetSocket = Object.keys(peers).find(id => peers[id].ip === targetIP);
-    const senderSocket = socket.id;
-    const deletedByIP = peers[socket.id]?.ip; // the deleter's IP
+    // Delete message for everyone
+    socket.on("delete-message", ({ targetIP, messageId }) => {
+        const targetSocket = Object.keys(peers).find(id => peers[id].ip === targetIP);
+        const senderSocket = socket.id;
+        if (targetSocket) {
+            io.to(targetSocket).emit("delete-message", { messageId });
+        }
+        io.to(senderSocket).emit("delete-message", { messageId });
+    });
 
-    if (targetSocket) {
-        io.to(targetSocket).emit("delete-message", { messageId, deletedBy: deletedByIP });
-    }
-    io.to(senderSocket).emit("delete-message", { messageId, deletedBy: deletedByIP });
-});
-
+    // ---------- FILE TRANSFER WITH CONCURRENCY LIMIT ----------
     socket.on("file-start", ({ targetIP, name, size, messageId }) => {
+        // If we are already at the limit, queue this request
+        if (activeFileTransfers >= MAX_CONCURRENT_FILE_TRANSFERS) {
+            pendingFileStarts.push({ socket, targetIP, name, size, messageId });
+            // Optionally notify sender that it's queued
+            socket.emit("file-queued", { messageId });
+            return;
+        }
+
+        // Otherwise forward immediately
+        forwardFileStart(socket, targetIP, name, size, messageId);
+    });
+
+    function forwardFileStart(socket, targetIP, name, size, messageId) {
         const targetSocket = Object.keys(peers).find(id => peers[id].ip === targetIP);
         if (targetSocket) {
+            activeFileTransfers++;
             io.to(targetSocket).emit("file-start", {
                 name,
                 size,
@@ -108,8 +137,11 @@ socket.on("delete-message", ({ targetIP, messageId }) => {
                 fromIP: peers[socket.id].ip,
                 messageId
             });
+        } else {
+            // Target not found – do not start transfer
+            socket.emit("file-cancel", { messageId, reason: "Target not online" });
         }
-    });
+    }
 
     socket.on("file-ready", ({ targetIP, name, messageId }) => {
         const targetSocket = Object.keys(peers).find(id => peers[id].ip === targetIP);
@@ -137,6 +169,9 @@ socket.on("delete-message", ({ targetIP, messageId }) => {
         if (targetSocket) {
             io.to(targetSocket).emit("file-end", { name, messageId });
         }
+        // Decrement active transfer count and process next pending
+        activeFileTransfers--;
+        processNextPendingFile();
     });
 
     socket.on("file-cancel", ({ targetIP, name, messageId }) => {
@@ -144,6 +179,9 @@ socket.on("delete-message", ({ targetIP, messageId }) => {
         if (targetSocket) {
             io.to(targetSocket).emit("file-cancel", { name, messageId });
         }
+        // Decrement active transfer count and process next pending
+        activeFileTransfers--;
+        processNextPendingFile();
     });
 
     socket.on("file-pause", ({ targetIP, name, messageId }) => {
@@ -168,6 +206,8 @@ socket.on("delete-message", ({ targetIP, messageId }) => {
     });
 
     socket.on("disconnect", () => {
+        // Clean up any pending file-starts for this socket
+        pendingFileStarts = pendingFileStarts.filter(p => p.socket.id !== socket.id);
         if (peers[socket.id]) {
             const disconnectedIP = peers[socket.id].ip;
             io.emit("peer-disconnected", disconnectedIP);
@@ -177,6 +217,28 @@ socket.on("delete-message", ({ targetIP, messageId }) => {
     });
 });
 
+function processNextPendingFile() {
+    if (pendingFileStarts.length === 0) return;
+    if (activeFileTransfers >= MAX_CONCURRENT_FILE_TRANSFERS) return;
+
+    const next = pendingFileStarts.shift();
+    forwardFileStart(next.socket, next.targetIP, next.name, next.size, next.messageId);
+}
+
+// Helper to get local IP
+function getLocalIP() {
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+            if (net.family === 'IPv4' && !net.internal) {
+                return net.address;
+            }
+        }
+    }
+    return 'localhost';
+}
+
+// Start server with fallback port
 const DEFAULT_PORT = 5000;
 portfinder.getPort({ port: DEFAULT_PORT }, (err, port) => {
     if (err) {
@@ -184,7 +246,7 @@ portfinder.getPort({ port: DEFAULT_PORT }, (err, port) => {
         process.exit(1);
     }
     server.listen(port, "0.0.0.0", () => {
-        const localIP = getServerLANIP();
+        const localIP = getLocalIP();
         console.log("=================================");
         console.log(`Server is running!`);
         console.log(`- Local access: http://localhost:${port}`);

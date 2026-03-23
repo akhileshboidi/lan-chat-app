@@ -808,3 +808,16 @@ body.dark-mode .message.deleted {
         font-size: 0.65em;
     }
 }
+/* Make sure buttons inside toast are clickable */
+.toast .toast-btn {
+    pointer-events: auto;
+}
+.reply-indicator {
+    font-size: 0.85em;
+    color: #667781;
+    border-left: 3px solid #25d366;
+    padding-left: 8px;
+    margin-bottom: 4px;
+    background: rgba(0,0,0,0.02);
+    border-radius: 4px;
+}

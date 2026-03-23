@@ -62,9 +62,11 @@ export function renderActiveConversation() {
         div.className = `message ${msg.isOwn ? 'own' : 'other'}${additionalClass}`;
         div.dataset.msgid = msg.id;
 
+        let contentHtml = '';
+
         if (msg.type === 'system') {
             div.className = `system-message ${msg.systemType || ''}`;
-            div.innerHTML = msg.content;
+            contentHtml = msg.content;
         } else {
             let statusHtml = '';
             if (msg.isOwn) {
@@ -72,43 +74,49 @@ export function renderActiveConversation() {
                 else if (msg.delivered) statusHtml = '<span class="tick delivered">✓✓</span>';
                 else statusHtml = '<span class="tick sent">✓</span>';
             }
+
+            // DEBUG: Log replyTo
             if (msg.replyTo) {
-                const replyDiv = document.createElement('div');
-                replyDiv.className = 'reply-indicator';
-                const sender = msg.replyTo.sender === 'You' ? 'You' : msg.replyTo.sender;
-                replyDiv.innerHTML = `<span>↪️ ${sender}: ${msg.replyTo.content}</span>`;
-                div.appendChild(replyDiv);
+                console.log('Reply found for message', msg.id, msg.replyTo);
             }
+
+            // Build reply indicator first
+            if (msg.replyTo) {
+                const sender = msg.replyTo.sender === 'You' ? 'You' : msg.replyTo.sender;
+                contentHtml += `<div class="reply-indicator"><span>↪️ ${sender}: ${msg.replyTo.content}</span></div>`;
+            }
+
+            // Main message content
             if (msg.type === 'text') {
                 if (msg.deleted) {
                     let deleteText = msg.isOwn ? 'You deleted this message' : `This message was deleted`;
-                    div.innerHTML += `${deleteText} ${statusHtml}<div class="timestamp">${msg.timestamp}</div>`;
+                    contentHtml += `${deleteText} ${statusHtml}<div class="timestamp">${msg.timestamp}</div>`;
                 } else {
-                    div.innerHTML += `${msg.content} ${statusHtml}<div class="timestamp">${msg.timestamp}</div>`;
+                    contentHtml += `${msg.content} ${statusHtml}<div class="timestamp">${msg.timestamp}</div>`;
                 }
             } else if (msg.type === 'file') {
                 if (msg.deleted) {
                     let deleteText = msg.isOwn ? 'You deleted this file' : `This file was deleted`;
-                    div.innerHTML += `${deleteText} ${statusHtml}<div class="timestamp">${msg.timestamp}</div>`;
+                    contentHtml += `${deleteText} ${statusHtml}<div class="timestamp">${msg.timestamp}</div>`;
                 } else {
-                    let content = `📁 ${msg.name}`;
+                    let fileContent = `📁 ${msg.name}`;
                     if (msg.url) {
-                        content += `<br><a href="${msg.url}" download="${msg.name}" class="download-link">📥 Download (${formatBytes(msg.size)})</a>`;
+                        fileContent += `<br><a href="${msg.url}" download="${msg.name}" class="download-link">📥 Download (${formatBytes(msg.size)})</a>`;
                     } else if (msg.needsRestore) {
-                        content += ` <span class="file-expired">(restoring...)</span>`;
+                        fileContent += ` <span class="file-expired">(restoring...)</span>`;
                     } else if (msg.fileDataLost) {
-                        content += ` <span class="file-expired">(expired, file not available after reload)</span>`;
+                        fileContent += ` <span class="file-expired">(expired, file not available after reload)</span>`;
                     } else {
                         const percent = msg.percent || 0;
                         const speed = msg.speed ? formatBytes(msg.speed) + '/s' : '';
-                        content += `
+                        fileContent += `
                             <div class="file-progress">
                                 <progress value="${percent}" max="100"></progress>
                                 <span class="file-speed">${percent}% ${speed}</span>
                             </div>`;
                         if (msg.isOwn && store.sendingFiles[msg.id]) {
                             const fileState = store.sendingFiles[msg.id];
-                            content += `
+                            fileContent += `
                                 <div class="file-controls">
                                     <button class="pause-file" data-id="${msg.id}" ${fileState.paused ? 'style="display:none;"' : ''}>⏸️</button>
                                     <button class="resume-file" data-id="${msg.id}" ${!fileState.paused ? 'style="display:none;"' : ''}>▶️</button>
@@ -116,23 +124,27 @@ export function renderActiveConversation() {
                                 </div>`;
                         }
                     }
-                    div.innerHTML += `${content} ${statusHtml}<div class="timestamp">${msg.timestamp}</div>`;
+                    contentHtml += `${fileContent} ${statusHtml}<div class="timestamp">${msg.timestamp}</div>`;
                 }
             }
-
-            if (!msg.deleted) {
-                const menuBtn = document.createElement('span');
-                menuBtn.className = 'msg-menu-btn';
-                menuBtn.textContent = '⋮';
-                menuBtn.dataset.msgId = msg.id;
-                menuBtn.dataset.msgIsOwn = msg.isOwn;
-                menuBtn.dataset.msgContent = msg.content || '';
-                menuBtn.dataset.msgName = msg.name || '';
-                menuBtn.dataset.msgSize = msg.size || '';
-                menuBtn.dataset.msgSender = msg.isOwn ? 'You' : (msg.senderName || 'Unknown');
-                div.appendChild(menuBtn);
-            }
         }
+
+        div.innerHTML = contentHtml;
+
+        // Add menu button separately (does not need to be in innerHTML)
+        if (msg.type !== 'system' && !msg.deleted) {
+            const menuBtn = document.createElement('span');
+            menuBtn.className = 'msg-menu-btn';
+            menuBtn.textContent = '⋮';
+            menuBtn.dataset.msgId = msg.id;
+            menuBtn.dataset.msgIsOwn = msg.isOwn;
+            menuBtn.dataset.msgContent = msg.content || '';
+            menuBtn.dataset.msgName = msg.name || '';
+            menuBtn.dataset.msgSize = msg.size || '';
+            menuBtn.dataset.msgSender = msg.isOwn ? 'You' : (msg.senderName || 'Unknown');
+            div.appendChild(menuBtn);
+        }
+
         chatBox.appendChild(div);
     });
 

@@ -1,18 +1,26 @@
+// public/js/modules/fileTransfer.js
 import * as store from '../store.js';
 import { updateFileMessage, renderActiveConversation, renderContactList } from './ui.js';
 import { saveFileToDB } from './indexeddb.js';
 import { formatBytes, getTimestamp } from './utils.js';
 
-export const CHUNK_SIZE = 64 * 1024;
+export const CHUNK_SIZE = 64 * 1024; // 64KB
+const MIN_DELAY = 15; // milliseconds between chunks (adjust based on network)
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 200; // initial retry delay in ms
 
 export function sendNextChunk(messageId) {
     const sender = store.sendingFiles[messageId];
     if (!sender || sender.paused || sender.cancelled || !sender.receiverReady) return;
     if (sender.offset >= sender.fileSize) return;
 
+    // If we are currently waiting for a retry timeout, don't send yet
+    if (sender.retryTimeoutId) return;
+
     const chunk = sender.file.slice(sender.offset, sender.offset + CHUNK_SIZE);
     const reader = new FileReader();
     reader.onload = (e) => {
+        // Send chunk
         window.socket.emit('file-chunk', {
             targetIP: sender.targetIP,
             chunk: e.target.result,
@@ -20,6 +28,18 @@ export function sendNextChunk(messageId) {
             offset: sender.offset,
             messageId
         });
+        // Record that we sent this chunk (for retry)
+        sender.lastSentOffset = sender.offset;
+        sender.lastSentTime = Date.now();
+        // Start a retry timer – if we don't receive ACK within a timeout, resend
+        if (sender.retryTimer) clearTimeout(sender.retryTimer);
+        sender.retryTimer = setTimeout(() => {
+            if (!sender.cancelled && !sender.paused && sender.receiverReady && sender.offset === sender.lastSentOffset) {
+                console.log(`Retrying chunk at offset ${sender.offset} for ${messageId}`);
+                sendNextChunk(messageId); // resend
+            }
+        }, RETRY_DELAY);
+        // Update progress optimistically (sender side)
         const percent = Math.min(100, Math.floor((sender.offset / sender.fileSize) * 100));
         const elapsed = (Date.now() - sender.startTime) / 1000;
         const speed = sender.offset / elapsed;
@@ -37,7 +57,8 @@ export function handleFileStart(socket, name, size, fromIP, messageId) {
         totalSize: size,
         receivedSize: 0,
         chunks: [],
-        cancelled: false
+        cancelled: false,
+        retryCount: 0
     };
     store.conversations[fromIP].messages.push({
         id: messageId,
@@ -65,10 +86,16 @@ export function handleFileStart(socket, name, size, fromIP, messageId) {
 export function handleFileChunk(socket, chunk, name, offset, messageId) {
     const receiver = store.receivingFiles[messageId];
     if (!receiver || receiver.cancelled) return;
-    receiver.chunks.push(chunk);
-    receiver.receivedSize += chunk.byteLength;
-    const percent = Math.min(100, Math.floor((receiver.receivedSize / receiver.totalSize) * 100));
-    updateFileMessage(receiver.senderIP, messageId, { percent });
+    // Check if this chunk is the expected one (could be duplicate due to retry)
+    if (offset === receiver.receivedSize) {
+        receiver.chunks.push(chunk);
+        receiver.receivedSize += chunk.byteLength;
+        const percent = Math.min(100, Math.floor((receiver.receivedSize / receiver.totalSize) * 100));
+        updateFileMessage(receiver.senderIP, messageId, { percent });
+    } else {
+        // Possibly out of order or duplicate; ignore.
+        console.log(`Ignoring chunk at offset ${offset}, expected ${receiver.receivedSize}`);
+    }
     socket.emit('file-chunk-ack', { targetIP: receiver.senderIP, name, offset, messageId });
 }
 
@@ -99,6 +126,7 @@ export function pauseFile(messageId) {
     const sender = store.sendingFiles[messageId];
     if (sender && !sender.cancelled) {
         sender.paused = true;
+        if (sender.retryTimer) clearTimeout(sender.retryTimer);
         window.socket.emit('file-pause', { targetIP: sender.targetIP, name: sender.fileName, messageId });
         updateFileMessage(sender.targetIP, messageId, {});
     }
@@ -118,6 +146,7 @@ export function cancelFile(messageId) {
     const sender = store.sendingFiles[messageId];
     if (sender && !sender.cancelled) {
         sender.cancelled = true;
+        if (sender.retryTimer) clearTimeout(sender.retryTimer);
         window.socket.emit('file-cancel', { targetIP: sender.targetIP, name: sender.fileName, messageId });
         delete store.sendingFiles[messageId];
         updateFileMessage(sender.targetIP, messageId, { percent: 0, speed: 'Cancelled' });
@@ -125,22 +154,33 @@ export function cancelFile(messageId) {
     }
 }
 
-export function updateFileProgress(messageId, percent, speed) {
-    for (let ip in store.conversations) {
-        const msg = store.conversations[ip].messages.find(m => m.id === messageId);
-        if (msg) {
-            msg.percent = percent;
-            if (speed !== undefined) msg.speed = speed;
-            if (store.activePeerIP === ip) {
-                const progressDiv = document.getElementById(`progress-${messageId}`);
-                if (progressDiv) {
-                    const progress = progressDiv.querySelector('progress');
-                    if (progress) progress.value = percent;
-                    const speedSpan = progressDiv.querySelector('.file-speed');
-                    if (speedSpan) speedSpan.textContent = percent + '%' + (speed ? ' ' + formatBytes(speed) + '/s' : '');
-                }
-            }
-            break;
+// This function is called when we receive an ACK from the receiver.
+// It will update the offset, then schedule the next chunk with a delay.
+export function handleFileChunkAck(messageId, ackedOffset) {
+    const sender = store.sendingFiles[messageId];
+    if (!sender || sender.cancelled) return;
+
+    // Clear the retry timer for this chunk
+    if (sender.retryTimer) clearTimeout(sender.retryTimer);
+
+    if (ackedOffset === sender.offset) {
+        sender.offset += CHUNK_SIZE;
+        const percent = Math.min(100, Math.floor((sender.offset / sender.fileSize) * 100));
+        const elapsed = (Date.now() - sender.startTime) / 1000;
+        const speed = sender.offset / elapsed;
+        updateFileMessage(sender.targetIP, messageId, { percent, speed });
+
+        if (sender.offset < sender.fileSize) {
+            // Wait a small delay before sending the next chunk to avoid flooding
+            setTimeout(() => sendNextChunk(messageId), MIN_DELAY);
+        } else {
+            // File finished – mark as delivered
+            updateFileMessage(sender.targetIP, messageId, { percent: 100, speed, delivered: true });
+            window.socket.emit('file-end', { targetIP: sender.targetIP, name: sender.fileName, messageId });
+            delete store.sendingFiles[messageId];
         }
+    } else {
+        // Unexpected ACK – ignore (should not happen)
+        console.warn(`ACK offset mismatch: got ${ackedOffset}, expected ${sender.offset}`);
     }
 }
