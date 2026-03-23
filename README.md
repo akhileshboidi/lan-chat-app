@@ -107,14 +107,6 @@ project/
 │   └── whatsapp-seen-notification.mp3
 └── uploads/
 
-## 🧪 Testing Tips
-
-Try these scenarios:
-
-* Multiple users chatting simultaneously
-* Sending large files
-* Disconnect & reconnect WiFi
-* Pause/resume file transfer
 
 ## ⚡ Quick Start (One Command)
 
