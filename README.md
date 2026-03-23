@@ -80,32 +80,32 @@ Example:
 
 ## 📂 Project Structure
 project/
-├── server.js                          # Node.js server (with concurrency limits)
-├── package.json                       # Node dependencies
+├── server.js
+├── package.json
 ├── public/
-│   ├── index.html                     # Login page (always asks for credentials)
-│   ├── app.html                       # Main chat interface
+│   ├── index.html
+│   ├── app.html
 │   ├── css/
-│   │   └── app.css                    # All styles (including dark mode, toasts, modals)
+│   │   └── app.css
 │   ├── js/
-│   │   ├── main.js                    # Entry point (socket events, UI initialisation)
-│   │   ├── store.js                   # Global state (conversations, peers, etc.)
+│   │   ├── main.js
+│   │   ├── store.js
 │   │   └── modules/
-│   │       ├── utils.js               # Utility functions (formatBytes, timestamps, etc.)
-│   │       ├── notifications.js       # Toast notifications
-│   │       ├── sounds.js              # Sound control (mute, play)
-│   │       ├── modal.js               # Custom modal (confirm/prompt)
-│   │       ├── theme.js               # Dark/light mode toggle
-│   │       ├── blocklist.js           # Blocked contacts management
-│   │       ├── search.js              # Message search
-│   │       ├── indexeddb.js           # IndexedDB operations (file persistence)
-│   │       ├── fileTransfer.js        # File sending/receiving (with retry & rate limiting)
-│   │       ├── ui.js                  # Rendering of contact list and messages
-│   │       ├── contextMenu.js         # Right‑click / three‑dots message menu
-│   │       └── chatHeaderMenu.js      # Three‑dots menu in chat header (edit name, block, clear)
-│   └── whatsapp-web-notification.mp3  # Notification sound (optional)
-│   └── whatsapp-seen-notification.mp3 # Seen sound (optional)
-└── uploads/                           # Created automatically by server for received files
+│   │       ├── utils.js
+│   │       ├── notifications.js
+│   │       ├── sounds.js
+│   │       ├── modal.js
+│   │       ├── theme.js
+│   │       ├── blocklist.js
+│   │       ├── search.js
+│   │       ├── indexeddb.js
+│   │       ├── fileTransfer.js
+│   │       ├── ui.js
+│   │       ├── contextMenu.js
+│   │       └── chatHeaderMenu.js
+│   └── whatsapp-web-notification.mp3
+│   └── whatsapp-seen-notification.mp3
+└── uploads/
 
 ## 🧪 Testing Tips
 
