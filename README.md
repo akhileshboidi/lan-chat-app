@@ -1,6 +1,6 @@
 # 🚀 LAN Chat App
 
-A real-time **peer-to-peer LAN chat application** built using **Node.js, Express, and Socket.IO**.
+A real-time **LAN chat application** built using **Node.js, Express, and Socket.IO**.
 Supports messaging, file sharing, and multiple users over the same WiFi network.
 
 
